@@ -1,7 +1,7 @@
 import "dotenv/config";
 
-import { createPool } from "./database/client.js";
-import { createHttpApp } from "./http/app.js";
+import { createPool } from "./platform/database/client.js";
+import { createHttpApp } from "./bootstrap/http-app.js";
 
 const port = Number(process.env.PORT ?? 3001);
 const pool = createPool();
