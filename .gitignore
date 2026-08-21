@@ -1,0 +1,22 @@
+node_modules/
+dist/
+build/
+.react-router/
+# Local secrets (keep the documented templates tracked)
+.env
+.env.*
+!.env.example
+
+# Local database exports. Keep migration SQL under server/migrations tracked.
+*.backup
+*.dump
+*.sql.gz
+*.sqlite
+*.sqlite3
+*.db
+
+coverage/
+*.log
+.DS_Store
+test-results/
+playwright-report/

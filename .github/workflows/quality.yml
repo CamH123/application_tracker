@@ -1,0 +1,39 @@
+name: Quality
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: application_tracker_test
+          POSTGRES_USER: application_tracker
+          POSTGRES_PASSWORD: application_tracker
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U application_tracker -d application_tracker_test"
+          --health-interval 2s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run test:integration
+        env:
+          TEST_DATABASE_URL: postgres://application_tracker:application_tracker@localhost:5432/application_tracker_test
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e -w client
+        env:
+          TEST_DATABASE_URL: postgres://application_tracker:application_tracker@localhost:5432/application_tracker_test
+      - run: npm run build
