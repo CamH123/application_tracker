@@ -75,6 +75,9 @@ docker compose exec -T postgres pg_restore -U application_tracker -d application
 
 `--clean` replaces database objects in the target database. Keep backup files somewhere outside the repository.
 
+To inspect the local development database with pgAdmin, see
+[Viewing the local database with pgAdmin](docs/pgadmin.md).
+
 ## Environment variables
 
-The examples in `server/.env.example` and `client/.env.example` document all required values. The API runs on port 3001, the React Router client on 5173, PostgreSQL on 5432, and Ollama uses its standard `http://localhost:11434` URL.
+The examples in `server/.env.example` and `client/.env.example` document all required values. The API runs on port 3001, the React Router client on 5173, PostgreSQL is available on host port 5433, and Ollama uses its standard `http://localhost:11434` URL.

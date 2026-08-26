@@ -276,7 +276,7 @@ tbody tr:focus {
 .error-text {
   color: var(--red);
 }
-.modal-card {
+.dialog-card {
   width: min(860px, calc(100vw - 2rem));
   max-height: calc(100vh - 2rem);
   overflow: auto;
@@ -287,25 +287,25 @@ tbody tr:focus {
   color: var(--ink);
   box-shadow: 0 20px 70px #13211933;
 }
-.modal-card::backdrop {
+.dialog-card::backdrop {
   background: #111a16aa;
   backdrop-filter: blur(3px);
 }
-.modal-heading,
+.dialog-heading,
 .section-heading {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
 }
-.modal-heading {
+.dialog-heading {
   position: sticky;
   top: -1.4rem;
   background: var(--card);
   z-index: 2;
   padding: 0.5rem 0 1rem;
 }
-.modal-heading h2,
+.dialog-heading h2,
 .settings-card h2 {
   font-family: Georgia, serif;
   margin: 0;

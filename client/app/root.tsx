@@ -2,6 +2,7 @@ import {
   isRouteErrorResponse,
   Links,
   Meta,
+  NavLink,
   Outlet,
   Scripts,
   ScrollRestoration,
@@ -9,6 +10,8 @@ import {
 
 import type { Route } from "./+types/root";
 import "./app.css";
+import { useInboxBadge } from "./pages/inbox/use-inbox-badge";
+import { useSyncOnAppMount } from "./pages/inbox/use-sync-on-app-mount";
 
 export const links: Route.LinksFunction = () => [];
 
@@ -31,7 +34,37 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  return <Outlet />;
+  const inboxCount = useInboxBadge();
+  useSyncOnAppMount();
+
+  return (
+    <div className="app-frame">
+      <header className="topbar">
+        <div>
+          <span className="eyebrow">LOCAL WORKSPACE</span>
+          <strong>Job Tracker</strong>
+        </div>
+        <nav aria-label="Primary navigation">
+          <NavLink to="/" end>
+            Dashboard
+          </NavLink>
+          <NavLink to="/inbox">
+            Inbox{" "}
+            {inboxCount > 0 && (
+              <span
+                className="badge"
+                aria-label={`${inboxCount} active Inbox Items`}
+              >
+                {inboxCount}
+              </span>
+            )}
+          </NavLink>
+          <NavLink to="/settings">Settings</NavLink>
+        </nav>
+      </header>
+      <Outlet />
+    </div>
+  );
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {

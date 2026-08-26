@@ -1,14 +1,11 @@
 import {
   type RouteConfig,
   index,
-  layout,
   route,
 } from "@react-router/dev/routes";
 
 export default [
-  layout("layout/shell.tsx", [
-    index("routes/dashboard.tsx"),
-    route("inbox", "routes/inbox.tsx"),
-    route("settings", "routes/settings.tsx"),
-  ]),
+  index("pages/dashboard/dashboard.tsx"),
+  route("inbox", "pages/inbox/inbox.tsx"),
+  route("settings", "pages/settings/settings.tsx"),
 ] satisfies RouteConfig;
