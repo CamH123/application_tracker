@@ -27,7 +27,7 @@ describe("JSON API", () => {
     expect(response.body.error).toBe("validation_error");
     expect(
       response.body.fields.map((field: { field: string }) => field.field),
-    ).toContain("companyId");
+    ).toContain("companyName");
   });
 
   it("validates route identifiers before repository access", async () => {

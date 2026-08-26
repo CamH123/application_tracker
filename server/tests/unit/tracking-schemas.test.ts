@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { eventInputSchema } from "../../src/modules/tracking/schemas.js";
+import {
+  eventInputSchema,
+  manualApplicationInputSchema,
+} from "../../src/modules/tracking/schemas.js";
 import { proposalSchema } from "../../src/modules/inbox/proposal.js";
 
 describe("Application Event request validation", () => {
@@ -47,5 +50,27 @@ describe("Application Event request validation", () => {
         },
       }).success,
     ).toBe(true);
+  });
+});
+
+describe("Manual Application request validation", () => {
+  const input = {
+    companyName: "Google",
+    recruitingCycle: { season: "Summer", year: 2027 },
+    roleTitle: "SWE Intern",
+    submissionDate: "2027-01-12",
+  };
+
+  it("accepts a valid Recruiting Cycle identity", () => {
+    expect(manualApplicationInputSchema.safeParse(input).success).toBe(true);
+  });
+
+  it("rejects invalid Recruiting Cycle values", () => {
+    expect(
+      manualApplicationInputSchema.safeParse({
+        ...input,
+        recruitingCycle: { season: "Autumn", year: 1999 },
+      }).success,
+    ).toBe(false);
   });
 });

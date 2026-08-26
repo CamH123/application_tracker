@@ -38,34 +38,85 @@ databaseDescribe("manual tracking against PostgreSQL", () => {
   });
   afterAll(async () => pool?.end());
 
-  it("creates a Submitted Application and recalculates status after event changes", async () => {
+  it("creates a Submitted Application and its first relationship records", async () => {
     const app = createHttpApp(pool);
-    const company = (
-      await request(app)
-        .post("/api/companies")
-        .send({ name: "Google", candidatePortalUrl: null })
-    ).body.company;
-    const cycle = (
-      await request(app)
-        .post("/api/recruiting-cycles")
-        .send({ season: "Summer", year: 2027 })
-    ).body.recruitingCycle;
-    const created = await request(app).post("/api/applications").send({
-      companyId: company.id,
-      recruitingCycleId: cycle.id,
-      roleTitle: "SWE Intern",
-      submissionDate: "2027-01-12",
-      isReferred: false,
-    });
+    const created = await request(app)
+      .post("/api/applications")
+      .send({
+        companyName: "Google",
+        recruitingCycle: { season: "Summer", year: 2027 },
+        roleTitle: "SWE Intern",
+        submissionDate: "2027-01-12",
+        isReferred: false,
+        externalApplicationId: "google-application-1",
+      });
     expect(created.status).toBe(201);
     expect(created.body.application).toMatchObject({
       currentStatus: "Applied",
       completion: "active",
     });
     expect(created.body.application.events).toHaveLength(1);
+    expect(created.body.application.company).toMatchObject({
+      name: "Google",
+      candidatePortalUrl: null,
+    });
+    expect(created.body.application.recruitingCycle).toMatchObject({
+      season: "Summer",
+      year: 2027,
+    });
+  });
+
+  it("reuses natural identities and rolls them back when the Application conflicts", async () => {
+    const app = createHttpApp(pool);
+    const first = (await request(app).get("/api/applications")).body
+      .applications[0];
+    const reused = await request(app)
+      .post("/api/applications")
+      .send({
+        companyName: "  google ",
+        recruitingCycle: { season: "Summer", year: 2027 },
+        roleTitle: "Product Intern",
+        submissionDate: "2027-01-13",
+      });
+    expect(reused.status).toBe(201);
+    expect(reused.body.application.company.id).toBe(first.company.id);
+    expect(reused.body.application.recruitingCycle.id).toBe(
+      first.recruitingCycle.id,
+    );
+
+    const rejected = await request(app)
+      .post("/api/applications")
+      .send({
+        companyName: "Orphan Company",
+        recruitingCycle: { season: "Winter", year: 2028 },
+        roleTitle: "New Role",
+        submissionDate: "2027-01-14",
+        externalApplicationId: "google-application-1",
+      });
+    expect(rejected.status).toBe(409);
+    expect(
+      (await request(app).get("/api/companies")).body.companies,
+    ).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Orphan Company" }),
+      ]),
+    );
+    expect(
+      (await request(app).get("/api/recruiting-cycles")).body.recruitingCycles,
+    ).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ season: "Winter", year: 2028 }),
+      ]),
+    );
+  });
+
+  it("recalculates status after event changes", async () => {
+    const app = createHttpApp(pool);
+    const created = (await request(app).get("/api/applications")).body
+      .applications[0];
 
     const scheduled = await request(app)
-      .post(`/api/applications/${created.body.application.id}/events`)
+      .post(`/api/applications/${created.id}/events`)
       .send({
         eventType: "interview_scheduled",
         occurredOn: "2027-02-10",
@@ -75,11 +126,8 @@ databaseDescribe("manual tracking against PostgreSQL", () => {
       });
     expect(scheduled.status).toBe(201);
     expect(
-      (
-        await request(app).get(
-          `/api/applications/${created.body.application.id}`,
-        )
-      ).body.application.currentStatus,
+      (await request(app).get(`/api/applications/${created.id}`)).body
+        .application.currentStatus,
     ).toBe("Interviewing");
     await request(app)
       .patch(`/api/application-events/${scheduled.body.event.id}`)
@@ -89,28 +137,54 @@ databaseDescribe("manual tracking against PostgreSQL", () => {
         roundLabel: "Technical 1",
       });
     expect(
-      (
-        await request(app).get(
-          `/api/applications/${created.body.application.id}`,
-        )
-      ).body.application.currentStatus,
+      (await request(app).get(`/api/applications/${created.id}`)).body
+        .application.currentStatus,
     ).toBe("Awaiting response");
   });
 
   it("enforces normalized duplicate Applications in PostgreSQL", async () => {
     const app = createHttpApp(pool);
-    const company = (await request(app).get("/api/companies")).body
-      .companies[0];
-    const cycle = (await request(app).get("/api/recruiting-cycles")).body
-      .recruitingCycles[0];
-    const duplicate = await request(app).post("/api/applications").send({
-      companyId: company.id,
-      recruitingCycleId: cycle.id,
-      roleTitle: "  swe   intern ",
-      submissionDate: "2027-01-13",
-    });
+    const duplicate = await request(app)
+      .post("/api/applications")
+      .send({
+        companyName: "Google",
+        recruitingCycle: { season: "Summer", year: 2027 },
+        roleTitle: "  swe   intern ",
+        submissionDate: "2027-01-13",
+      });
     expect(duplicate.status).toBe(409);
     expect(duplicate.body.error).toBe("conflict");
+  });
+
+  it("merges a manually created Company through the Settings API", async () => {
+    const app = createHttpApp(pool);
+    const created = await request(app)
+      .post("/api/applications")
+      .send({
+        companyName: "Merge Source",
+        recruitingCycle: { season: "Fall", year: 2027 },
+        roleTitle: "Analyst",
+        submissionDate: "2027-01-14",
+      });
+    const survivor = (
+      await request(app)
+        .post("/api/companies")
+        .send({ name: "Merge Survivor", candidatePortalUrl: null })
+    ).body.company;
+    expect(
+      (
+        await request(app)
+          .post(`/api/companies/${created.body.application.company.id}/merge`)
+          .send({ survivorId: survivor.id })
+      ).status,
+    ).toBe(204);
+    expect(
+      (
+        await request(app).get(
+          `/api/applications/${created.body.application.id}`,
+        )
+      ).body.application.company.id,
+    ).toBe(survivor.id);
   });
 
   it("accepts one edited Inbox proposal transactionally and retains provenance", async () => {

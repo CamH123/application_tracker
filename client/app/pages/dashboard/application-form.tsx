@@ -1,7 +1,10 @@
-import { useState, type SyntheticEvent } from "react";
+import { useId, useMemo, useState, type SyntheticEvent } from "react";
 import { ApiError } from "../../lib/api-client";
 import type { Application, Company, RecruitingCycle } from "../../lib/types";
 import type { ApplicationInput } from "./dashboard-api";
+
+const seasons = ["Spring", "Summer", "Fall", "Winter"] as const;
+const cyclePattern = /^(Spring|Summer|Fall|Winter)\s+(\d{4})$/;
 
 export function ApplicationForm({
   application,
@@ -18,13 +21,28 @@ export function ApplicationForm({
 }) {
   const [error, setError] = useState("");
   const [duplicate, setDuplicate] = useState(false);
+  const [recruitingCycle, setRecruitingCycle] = useState("Summer 2027");
+  const [cycleSuggestionsOpen, setCycleSuggestionsOpen] = useState(false);
+  const cycleSuggestionsId = useId();
+  const cycleOptions = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...cycles.map((cycle) => `${cycle.season} ${cycle.year}`),
+          ...[2027, 2028, 2029].flatMap((year) =>
+            seasons.map((season) => `${season} ${year}`),
+          ),
+        ]),
+      ),
+    [cycles],
+  );
 
-  const submit = async (event: SyntheticEvent<HTMLFormElement, SubmitEvent>) => {
+  const submit = async (
+    event: SyntheticEvent<HTMLFormElement, SubmitEvent>,
+  ) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    const body = {
-      companyId: String(data.get("companyId")),
-      recruitingCycleId: String(data.get("recruitingCycleId")),
+    const shared = {
       roleTitle: String(data.get("roleTitle")),
       submissionDate: String(data.get("submissionDate")),
       applicationUrl: String(data.get("applicationUrl")) || null,
@@ -34,13 +52,37 @@ export function ApplicationForm({
       isReferred: data.get("isReferred") === "on",
       notes: String(data.get("notes")) || null,
     };
-    const role = body.roleTitle.trim().replace(/\s+/g, " ").toLowerCase();
+    const match = cyclePattern.exec(String(data.get("recruitingCycle")).trim());
     if (
+      !application &&
+      (!match || Number(match[2]) < 2000 || Number(match[2]) > 2200)
+    ) {
+      setError(
+        "Recruiting Cycle: Use Season YYYY with a year from 2000 to 2200",
+      );
+      return;
+    }
+    const body = application
+      ? {
+          ...shared,
+          companyId: String(data.get("companyId")),
+          recruitingCycleId: String(data.get("recruitingCycleId")),
+        }
+      : {
+          ...shared,
+          companyName: String(data.get("companyName")),
+          recruitingCycle: { season: match![1], year: Number(match![2]) },
+        };
+    const role = shared.roleTitle.trim().replace(/\s+/g, " ").toLowerCase();
+    const companyId = String(data.get("companyId"));
+    const recruitingCycleId = String(data.get("recruitingCycleId"));
+    if (
+      application &&
       applications.some(
         (item) =>
-          item.id !== application?.id &&
-          item.company.id === body.companyId &&
-          item.recruitingCycle.id === body.recruitingCycleId &&
+          item.id !== application.id &&
+          item.company.id === companyId &&
+          item.recruitingCycle.id === recruitingCycleId &&
           item.roleTitle.trim().replace(/\s+/g, " ").toLowerCase() === role,
       )
     ) {
@@ -49,6 +91,7 @@ export function ApplicationForm({
     }
     try {
       setError("");
+      setDuplicate(false);
       await onSave(body);
     } catch (reason) {
       setError(
@@ -63,17 +106,21 @@ export function ApplicationForm({
     <form onSubmit={submit} className="form-grid">
       <label>
         Company
-        <select
-          required
-          name="companyId"
-          defaultValue={application?.company.id}
-        >
-          {companies.map((company) => (
-            <option key={company.id} value={company.id}>
-              {company.name}
-            </option>
-          ))}
-        </select>
+        {application ? (
+          <select
+            required
+            name="companyId"
+            defaultValue={application.company.id}
+          >
+            {companies.map((company) => (
+              <option key={company.id} value={company.id}>
+                {company.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input required name="companyName" autoComplete="organization" />
+        )}
       </label>
       <label>
         Role title
@@ -85,17 +132,65 @@ export function ApplicationForm({
       </label>
       <label>
         Recruiting Cycle
-        <select
-          required
-          name="recruitingCycleId"
-          defaultValue={application?.recruitingCycle.id}
-        >
-          {cycles.map((cycle) => (
-            <option key={cycle.id} value={cycle.id}>
-              {cycle.season} {cycle.year}
-            </option>
-          ))}
-        </select>
+        {application ? (
+          <select
+            required
+            name="recruitingCycleId"
+            defaultValue={application.recruitingCycle.id}
+          >
+            {cycles.map((cycle) => (
+              <option key={cycle.id} value={cycle.id}>
+                {cycle.season} {cycle.year}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <div className="cycle-combobox">
+            <input
+              required
+              name="recruitingCycle"
+              value={recruitingCycle}
+              role="combobox"
+              aria-autocomplete="list"
+              aria-controls={cycleSuggestionsId}
+              aria-expanded={cycleSuggestionsOpen}
+              onChange={(event) => {
+                setRecruitingCycle(event.target.value);
+                setCycleSuggestionsOpen(true);
+              }}
+              onFocus={() => setCycleSuggestionsOpen(true)}
+              onBlur={() => setCycleSuggestionsOpen(false)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") setCycleSuggestionsOpen(false);
+              }}
+            />
+            {cycleSuggestionsOpen && (
+              <div
+                id={cycleSuggestionsId}
+                className="cycle-suggestions"
+                role="listbox"
+                aria-label="Suggested recruiting cycles"
+              >
+                {cycleOptions.map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    role="option"
+                    className="cycle-suggestion"
+                    aria-selected={option === recruitingCycle}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => {
+                      setRecruitingCycle(option);
+                      setCycleSuggestionsOpen(false);
+                    }}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </label>
       <label>
         Submission date

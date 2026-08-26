@@ -25,14 +25,7 @@ export function Dialog({
     };
   }, []);
   return (
-    <dialog
-      ref={dialog}
-      aria-labelledby={titleId}
-      className="dialog-card"
-      onClick={(event) => {
-        if (event.target === dialog.current) onClose();
-      }}
-    >
+    <dialog ref={dialog} aria-labelledby={titleId} className="dialog-card">
       <div className="dialog-heading">
         <h2 id={titleId}>{title}</h2>
         <button

@@ -5,25 +5,6 @@ test("manual Application workflow and accessible dialogs", async ({ page }) => {
   const companyName = `E2E Company ${suffix}`;
   const roleTitle = `E2E Engineer ${suffix}`;
 
-  await page.goto("/settings");
-  const companies = page
-    .locator("section.settings-card")
-    .filter({ hasText: "Companies" });
-  await companies.getByLabel("Name").fill(companyName);
-  await companies
-    .getByLabel("Candidate-portal URL")
-    .fill("https://example.com/candidates");
-  await companies.getByRole("button", { name: "Add Company" }).click();
-  await expect(companies.getByText(companyName)).toBeVisible();
-
-  const cycles = page
-    .locator("section.settings-card")
-    .filter({ hasText: "Recruiting Cycles" });
-  await cycles.getByLabel("Season").selectOption("Winter");
-  await cycles.getByLabel("Year").fill("2199");
-  await cycles.getByRole("button", { name: "Add cycle" }).click();
-  await expect(cycles.getByText("Winter 2199")).toBeVisible();
-
   await page.goto("/");
   const newApplication = page.getByRole("button", { name: "New Application" });
   await expect(newApplication).toBeEnabled();
@@ -39,11 +20,9 @@ test("manual Application workflow and accessible dialogs", async ({ page }) => {
 
   await newApplication.click();
   const dialog = page.getByRole("dialog", { name: "New Application" });
-  await dialog.getByLabel("Company").selectOption({ label: companyName });
+  await dialog.getByLabel("Company").fill(companyName);
   await dialog.getByLabel("Role title").fill(roleTitle);
-  await dialog
-    .getByLabel("Recruiting Cycle")
-    .selectOption({ label: "Winter 2199" });
+  await dialog.getByLabel("Recruiting Cycle").fill("Winter 2199");
   await dialog.getByLabel("Submission date").fill("2027-01-12");
   await dialog.getByRole("button", { name: "Save Application" }).click();
 
@@ -51,6 +30,15 @@ test("manual Application workflow and accessible dialogs", async ({ page }) => {
     name: new RegExp(`${companyName}.*${roleTitle}`),
   });
   await expect(row).toContainText("Applied");
+  await page.goto("/settings");
+  await expect(page.getByText(companyName)).toBeVisible();
+  await page.goto("/");
+  await newApplication.click();
+  await page.getByLabel("Recruiting Cycle").focus();
+  await expect(
+    page.getByRole("listbox", { name: "Suggested recruiting cycles" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Close dialog" }).click();
   await row.click();
   const detail = page.getByRole("dialog", {
     name: `${companyName} · ${roleTitle}`,
@@ -85,6 +73,72 @@ test("manual Application workflow and accessible dialogs", async ({ page }) => {
     .getByRole("button", { name: "Delete permanently" })
     .click();
   await expect(page.getByText(roleTitle)).not.toBeVisible();
+});
+
+test("New Application opens without stored relationship records", async ({
+  page,
+}) => {
+  await page.route("**/api/applications**", (route) =>
+    route.fulfill({ json: { applications: [] } }),
+  );
+  await page.route("**/api/companies", (route) =>
+    route.fulfill({ json: { companies: [] } }),
+  );
+  await page.route("**/api/recruiting-cycles", (route) =>
+    route.fulfill({ json: { recruitingCycles: [] } }),
+  );
+  await page.goto("/");
+  await page.getByRole("button", { name: "New Application" }).click();
+  const dialog = page.getByRole("dialog", { name: "New Application" });
+  await expect(dialog.getByLabel("Company")).toHaveAttribute(
+    "name",
+    "companyName",
+  );
+  await expect(dialog.getByLabel("Recruiting Cycle")).toBeVisible();
+  await expect(dialog.getByLabel("Recruiting Cycle")).toHaveValue(
+    "Summer 2027",
+  );
+  await dialog.getByLabel("Recruiting Cycle").focus();
+  const suggestions = dialog.getByRole("listbox", {
+    name: "Suggested recruiting cycles",
+  });
+  await expect(suggestions).toBeVisible();
+  await expect(suggestions).toHaveCSS("max-height", "208px");
+  await expect(suggestions.getByRole("option").first()).toHaveCSS(
+    "color",
+    "rgb(23, 34, 29)",
+  );
+  const dialogBox = await dialog.boundingBox();
+  expect(dialogBox).not.toBeNull();
+  expect(dialogBox!.x).toBeGreaterThan(0);
+  expect(dialogBox!.y).toBeGreaterThan(0);
+  await dialog.getByLabel("Company").click();
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel("Company").fill("Typed Company");
+  await dialog.getByLabel("Role title").fill("Typed Role");
+  await dialog.getByLabel("Recruiting Cycle").fill("Fall 2030");
+  await dialog.getByLabel("Submission date").fill("2027-01-12");
+  const submitted = page.waitForRequest(
+    (request) =>
+      request.url().endsWith("/api/applications") &&
+      request.method() === "POST",
+  );
+  await dialog.getByRole("button", { name: "Save Application" }).click();
+  expect((await submitted).postDataJSON()).toMatchObject({
+    companyName: "Typed Company",
+    recruitingCycle: { season: "Fall", year: 2030 },
+  });
+
+  await page.getByRole("button", { name: "New Application" }).click();
+  const invalidDialog = page.getByRole("dialog", { name: "New Application" });
+  await invalidDialog.getByLabel("Company").fill("Typed Company");
+  await invalidDialog.getByLabel("Role title").fill("Typed Role");
+  await invalidDialog.getByLabel("Recruiting Cycle").fill("Autumn 2027");
+  await invalidDialog.getByLabel("Submission date").fill("2027-01-12");
+  await invalidDialog.getByRole("button", { name: "Save Application" }).click();
+  await expect(invalidDialog.getByRole("alert")).toContainText(
+    "Use Season YYYY",
+  );
 });
 
 test("running Sync Activity exposes progress and live scanned count", async ({

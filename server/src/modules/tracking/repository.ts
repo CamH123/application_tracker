@@ -121,6 +121,14 @@ export interface ApplicationInput {
   inboxItemId?: string | null | undefined;
 }
 
+export interface ManualApplicationInput extends Omit<
+  ApplicationInput,
+  "companyId" | "recruitingCycleId"
+> {
+  companyName: string;
+  recruitingCycle: Pick<RecruitingCycle, "season" | "year">;
+}
+
 export class ApplicationRepository {
   constructor(private readonly database: Database) {}
 
@@ -378,6 +386,28 @@ export class CompanyRepository {
     return mapCompany(result.rows[0]!);
   }
 
+  async createOrFind(
+    name: string,
+    candidatePortalUrl: string | null,
+  ): Promise<Company> {
+    const created = await this.database.query<CompanyRow>(
+      `INSERT INTO companies (owner_id,name,normalized_name,candidate_portal_url)
+       VALUES ($1,$2,$3,$4)
+       ON CONFLICT (owner_id, normalized_name) DO NOTHING
+       RETURNING id,name,normalized_name,candidate_portal_url`,
+      [
+        LOCAL_OWNER_ID,
+        name.trim(),
+        normalizeCompanyName(name),
+        candidatePortalUrl,
+      ],
+    );
+    if (created.rows[0]) return mapCompany(created.rows[0]);
+    const company = await this.findByName(name);
+    if (!company) throw new Error("Company was not available after creation");
+    return company;
+  }
+
   async update(
     id: string,
     name: string,
@@ -461,6 +491,23 @@ export class RecruitingCycleRepository {
       [LOCAL_OWNER_ID, season, year],
     );
     return result.rows[0]!;
+  }
+
+  async createOrFind(
+    season: RecruitingCycle["season"],
+    year: number,
+  ): Promise<RecruitingCycle> {
+    const created = await this.database.query<CycleRow>(
+      `INSERT INTO recruiting_cycles(owner_id,season,year) VALUES($1,$2,$3)
+       ON CONFLICT (owner_id, season, year) DO NOTHING
+       RETURNING id,season,year`,
+      [LOCAL_OWNER_ID, season, year],
+    );
+    if (created.rows[0]) return created.rows[0];
+    const cycle = await this.find(season, year);
+    if (!cycle)
+      throw new Error("Recruiting Cycle was not available after creation");
+    return cycle;
   }
 
   async update(

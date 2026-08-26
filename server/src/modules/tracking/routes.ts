@@ -5,6 +5,7 @@ import { ConflictError, NotFoundError } from "../../platform/http/errors.js";
 import { parse, routeId } from "../../platform/http/parse.js";
 import {
   applicationInputSchema,
+  manualApplicationInputSchema,
   companyInputSchema,
   cycleInputSchema,
   eventInputSchema,
@@ -44,11 +45,11 @@ export const registerTrackingRoutes = (
 
   app.post("/api/applications", async (request, response) => {
     const input = cleanApplicationInput(
-      parse(applicationInputSchema, request.body),
+      parse(manualApplicationInputSchema, request.body),
     );
     response
       .status(201)
-      .json({ application: await tracking.createApplication(input) });
+      .json({ application: await tracking.createManualApplication(input) });
   });
   app.get("/api/applications/:id", async (request, response) => {
     const application = await tracking.getApplication(
@@ -75,11 +76,9 @@ export const registerTrackingRoutes = (
   });
   app.post("/api/applications/:id/events", async (request, response) => {
     const input = parse(eventInputSchema, request.body);
-    response
-      .status(201)
-      .json({
-        event: await tracking.createEvent(routeId(request.params.id), input),
-      });
+    response.status(201).json({
+      event: await tracking.createEvent(routeId(request.params.id), input),
+    });
   });
   app.patch("/api/application-events/:id", async (request, response) => {
     const input = parse(eventInputSchema, request.body);
@@ -98,14 +97,12 @@ export const registerTrackingRoutes = (
   );
   app.post("/api/companies", async (request, response) => {
     const input = parse(companyInputSchema, request.body);
-    response
-      .status(201)
-      .json({
-        company: await tracking.createCompany(
-          input.name,
-          input.candidatePortalUrl || null,
-        ),
-      });
+    response.status(201).json({
+      company: await tracking.createCompany(
+        input.name,
+        input.candidatePortalUrl || null,
+      ),
+    });
   });
   app.patch("/api/companies/:id", async (request, response) => {
     const input = parse(companyInputSchema, request.body);
@@ -140,11 +137,9 @@ export const registerTrackingRoutes = (
   );
   app.post("/api/recruiting-cycles", async (request, response) => {
     const input = parse(cycleInputSchema, request.body);
-    response
-      .status(201)
-      .json({
-        recruitingCycle: await tracking.createCycle(input.season, input.year),
-      });
+    response.status(201).json({
+      recruitingCycle: await tracking.createCycle(input.season, input.year),
+    });
   });
   app.patch("/api/recruiting-cycles/:id", async (request, response) => {
     const input = parse(cycleInputSchema, request.body);

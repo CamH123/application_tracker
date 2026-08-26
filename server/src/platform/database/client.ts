@@ -2,6 +2,7 @@ import pg from "pg";
 
 pg.types.setTypeParser(1114, (value) => value);
 pg.types.setTypeParser(1184, (value) => value);
+pg.types.setTypeParser(1082, (value) => value);
 
 export const LOCAL_OWNER_ID = "00000000-0000-4000-8000-000000000001";
 

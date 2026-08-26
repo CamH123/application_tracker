@@ -39,20 +39,9 @@ export default function Dashboard() {
           <a className="button secondary" href={eventsCsvUrl()}>
             Export CSV
           </a>
-          <button
-            disabled={!companies.length || !cycles.length}
-            onClick={() => setCreating(true)}
-          >
-            New Application
-          </button>
+          <button onClick={() => setCreating(true)}>New Application</button>
         </div>
       </div>
-      {(!companies.length || !cycles.length) && !loading && (
-        <div className="notice">
-          Create at least one Company and Recruiting Cycle in{" "}
-          <a href="/settings">Settings</a> before adding an Application.
-        </div>
-      )}
       <DashboardFilters
         companies={companies}
         cycles={cycles}

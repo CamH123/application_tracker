@@ -18,6 +18,7 @@ import {
   RecruitingCycleRepository,
   type ApplicationInput,
   type EventInput,
+  type ManualApplicationInput,
 } from "./repository.js";
 import type { Proposal, ProposedApplicationFields } from "../inbox/proposal.js";
 
@@ -105,6 +106,25 @@ export class TrackingService {
         input,
       );
       return applications.get(id);
+    });
+  }
+
+  async createManualApplication(input: ManualApplicationInput) {
+    return inTransaction(this.pool, async (database) => {
+      const company = await this.companies(database).createOrFind(
+        input.companyName,
+        null,
+      );
+      const cycle = await this.cycles(database).createOrFind(
+        input.recruitingCycle.season,
+        input.recruitingCycle.year,
+      );
+      const id = await this.createApplicationWithSubmittedEvent(database, {
+        ...input,
+        companyId: company.id,
+        recruitingCycleId: cycle.id,
+      });
+      return this.applications(database).get(id);
     });
   }
 
@@ -273,21 +293,14 @@ export class TrackingService {
   ): Promise<string> {
     const companies = this.companies(database);
     const cycles = this.cycles(database);
-    const company =
-      (await companies.findByName(proposal.companyName)) ??
-      (await companies.create(
-        proposal.companyName,
-        proposal.candidatePortalUrl || null,
-      ));
-    const cycle =
-      (await cycles.find(
-        proposal.recruitingCycle.season,
-        proposal.recruitingCycle.year,
-      )) ??
-      (await cycles.create(
-        proposal.recruitingCycle.season,
-        proposal.recruitingCycle.year,
-      ));
+    const company = await companies.createOrFind(
+      proposal.companyName,
+      proposal.candidatePortalUrl || null,
+    );
+    const cycle = await cycles.createOrFind(
+      proposal.recruitingCycle.season,
+      proposal.recruitingCycle.year,
+    );
     return this.createApplicationWithSubmittedEvent(database, {
       companyId: company.id,
       recruitingCycleId: cycle.id,
@@ -317,9 +330,16 @@ export class TrackingService {
   }
 }
 
-export const cleanApplicationInput = <T extends ApplicationInput>(
+export const cleanApplicationInput = <
+  T extends {
+    applicationUrl?: string | null | undefined;
+    externalApplicationId?: string | null | undefined;
+    location?: string | null | undefined;
+    notes?: string | null | undefined;
+  },
+>(
   input: T,
-): ApplicationInput => ({
+): T => ({
   ...input,
   applicationUrl: nullable(input.applicationUrl),
   externalApplicationId: nullable(input.externalApplicationId),

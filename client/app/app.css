@@ -279,6 +279,7 @@ tbody tr:focus {
 .dialog-card {
   width: min(860px, calc(100vw - 2rem));
   max-height: calc(100vh - 2rem);
+  margin: auto;
   overflow: auto;
   border: 1px solid var(--line);
   border-radius: 1rem;
@@ -286,6 +287,11 @@ tbody tr:focus {
   background: var(--card);
   color: var(--ink);
   box-shadow: 0 20px 70px #13211933;
+  scrollbar-color: var(--line) transparent;
+}
+.dialog-card::-webkit-scrollbar-track,
+.cycle-suggestions::-webkit-scrollbar-track {
+  background: transparent;
 }
 .dialog-card::backdrop {
   background: #111a16aa;
@@ -324,6 +330,38 @@ tbody tr:focus {
 }
 .form-grid .full {
   grid-column: 1/-1;
+}
+.cycle-combobox {
+  position: relative;
+}
+.cycle-combobox input {
+  width: 100%;
+}
+.cycle-suggestions {
+  position: absolute;
+  z-index: 3;
+  top: calc(100% + 0.25rem);
+  width: 100%;
+  max-height: 13rem;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  background: var(--card);
+  box-shadow: 0 12px 25px #13211922;
+  scrollbar-color: var(--line) transparent;
+}
+.cycle-suggestion {
+  display: block;
+  width: 100%;
+  border-radius: 0;
+  padding: 0.6rem 0.75rem;
+  color: var(--ink);
+  background: var(--card);
+  text-align: left;
+}
+.cycle-suggestion:hover,
+.cycle-suggestion[aria-selected="true"] {
+  background: var(--mint);
 }
 .check {
   flex-direction: row !important;

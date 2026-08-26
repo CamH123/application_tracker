@@ -31,6 +31,16 @@ export const applicationInputSchema = z.object({
   notes: nullableText,
 });
 
+export const manualApplicationInputSchema = applicationInputSchema
+  .omit({ companyId: true, recruitingCycleId: true })
+  .extend({
+    companyName: z.string().trim().min(1),
+    recruitingCycle: z.object({
+      season: z.enum(["Spring", "Summer", "Fall", "Winter"]),
+      year: z.number().int().min(2000).max(2200),
+    }),
+  });
+
 export const eventInputSchema = z
   .object({
     eventType: z.enum(EVENT_TYPES),
